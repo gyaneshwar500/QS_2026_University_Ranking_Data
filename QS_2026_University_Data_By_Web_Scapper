@@ -14,6 +14,8 @@ url = 'https://www.topuniversities.com/world-university-rankings'
 driver.get(url)
 time.sleep(4)
 
+# IMPORTANT Note : once above page gets loaded, switch to table view there manually and then run below codes.
+
 import re
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
