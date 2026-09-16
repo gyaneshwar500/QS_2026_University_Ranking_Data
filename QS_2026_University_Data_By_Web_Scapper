@@ -1,0 +1,87 @@
+import pandas as pd
+from selenium.common.exceptions import NoSuchElementException
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+import time
+
+
+options = Options()
+
+driver = webdriver.Chrome(options=options)
+driver.maximize_window()
+
+url = 'https://www.topuniversities.com/world-university-rankings'
+driver.get(url)
+time.sleep(4)
+
+import re
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+
+wait = WebDriverWait(driver, 10)
+is_number = lambda s: re.match(r'^\d+(\.\d+)?$', s) is not None
+
+all_rows = []
+page_num = 1
+
+while True:
+    
+    wait.until(EC.presence_of_element_located((By.ID, "ranking-data-load")))
+
+    
+    table = driver.find_elements(By.XPATH, '//*[@id="ranking-data-load"]')
+
+    
+    texts = []
+    for el in table:
+        for line in el.text.split("\n"):
+            line = line.strip()
+            if line:
+                texts.append(line)
+
+    i = 0
+    page_rows = []
+    while i < len(texts):
+        if i + 3 > len(texts):
+            print(f"Page {page_num}: leftover incomplete data at end:", texts[i:])
+            break
+        rank = texts[i]; i += 1
+        university = texts[i]; i += 1
+        location = texts[i]; i += 1
+        
+        while i < len(texts) and not is_number(texts[i]):
+            i += 1
+        if i + 4 > len(texts):
+            print(f"Page {page_num}: incomplete scores for {university}, remaining: {texts[i:]}")
+            break
+        scores = texts[i:i+4]
+        i += 4
+        page_rows.append([rank, university, location, *scores])
+
+    print(f"Page {page_num}: parsed {len(page_rows)} rows out of {len(texts)} tokens")
+    all_rows.extend(page_rows)
+
+    
+    try:
+        next_btn = driver.find_element(By.XPATH, '//a[contains(@class, "next")]')
+        parent_li = next_btn.find_element(By.XPATH, '..')
+
+        if 'disabled' in parent_li.get_attribute('class'):
+            print("Reached last page.")
+            break
+
+        next_btn.click()
+        time.sleep(2)
+        page_num += 1
+
+    except Exception as e:
+        print("No next button found — stopping.", e)
+        break
+
+
+df = pd.DataFrame(all_rows, columns=[
+    "Rank", "University", "Location",
+    "Score1", "Score2", "Score3", "Score4"
+])
+print(f"\nTotal parsed: {len(df)} rows across {page_num} pages")
